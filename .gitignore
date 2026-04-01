@@ -1,0 +1,24 @@
+# Secrets
+.env
+
+# Terraform
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/*.tfstate*
+
+# Packer
+packer/packer_cache/
+packer/*.log
+
+# Ansible
+ansible/inventory.yml
+ansible/retry
+
+# Python
+__pycache__/
+*.pyc
+
+# Generated files
+*.log

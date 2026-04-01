@@ -1,0 +1,82 @@
+---
+# ── Post-Deployment Ansible Playbook ──────────────────────────────
+# Runs after Terraform deploys VMs from the Fedora COSMIC Atomic template.
+# Installs extra packages and performs post-deployment configuration.
+#
+# Since Fedora Atomic uses rpm-ostree, packages are layered and require
+# a reboot to take effect.
+
+- name: Post-deployment configuration for Fedora COSMIC Atomic VMs
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    # Extra packages to install via rpm-ostree
+    # (these mirror dev tools from the Docker dev container)
+    extra_packages:
+      - git
+      - vim
+      - curl
+      - wget
+      - jq
+      - python3
+      - python3-pip
+      - htop
+      - tmux
+      - bash-completion
+
+  tasks:
+    # ── Wait for cloud-init to finish ──────────────────────────────
+    - name: Wait for cloud-init to complete
+      command: cloud-init status --wait
+      changed_when: false
+      timeout: 300
+
+    # ── Install extra packages via rpm-ostree ──────────────────────
+    - name: Check which packages are already layered
+      command: rpm-ostree status --json
+      register: ostree_status
+      changed_when: false
+
+    - name: Install extra packages via rpm-ostree
+      command: >
+        rpm-ostree install --idempotent --allow-inactive
+        {{ extra_packages | join(' ') }}
+      register: rpm_ostree_install
+      changed_when: "'Installing:' in rpm_ostree_install.stdout or 'Staging deployment' in rpm_ostree_install.stdout"
+
+    # ── Reboot if rpm-ostree made changes ──────────────────────────
+    - name: Reboot to apply rpm-ostree changes
+      reboot:
+        reboot_timeout: 300
+        msg: "Rebooting to apply rpm-ostree package layering"
+      when: rpm_ostree_install.changed
+
+    - name: Wait for system to come back after reboot
+      wait_for_connection:
+        timeout: 300
+      when: rpm_ostree_install.changed
+
+    # ── Ensure QEMU Guest Agent is running ─────────────────────────
+    - name: Ensure qemu-guest-agent is enabled and running
+      systemd:
+        name: qemu-guest-agent
+        enabled: true
+        state: started
+
+    # ── Verify deployment ──────────────────────────────────────────
+    - name: Gather system info
+      setup:
+        filter: "ansible_*"
+
+    - name: Display deployment summary
+      debug:
+        msg: |
+          ✓ VM Deployment Complete
+            Hostname:  {{ ansible_hostname }}
+            OS:        {{ ansible_distribution }} {{ ansible_distribution_version }}
+            IP:        {{ ansible_default_ipv4.address | default('N/A') }}
+            CPU:       {{ ansible_processor_vcpus }} vCPUs
+            Memory:    {{ (ansible_memtotal_mb / 1024) | round(1) }} GB
+            Disk:      {{ (ansible_devices.sda.size | default('N/A')) }}

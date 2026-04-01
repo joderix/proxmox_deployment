@@ -1,0 +1,12 @@
+services:
+  deployer:
+    build: .
+    container_name: proxmox-deployer
+    volumes:
+      - ./:/workspace
+    env_file:
+      - .env
+    stdin_open: true
+    tty: true
+    # Host networking so Packer HTTP server is reachable from Proxmox VMs
+    network_mode: host
