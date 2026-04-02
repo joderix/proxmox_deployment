@@ -42,7 +42,7 @@ variable "base_cloud_image_file" {
 variable "base_cloud_image_vm_id" {
   type        = number
   default     = 9002
-  description = "VMID of pre-imported Ubuntu cloud-image base template to clone (created from base_cloud_image_file)."
+  description = "VMID of pre-imported Ubuntu cloud-image base template to clone (created from base_cloud_image_file). Override via PKR_VAR_base_cloud_image_vm_id with your actual Proxmox VMID."
 }
 
 variable "ssh_public_key" {

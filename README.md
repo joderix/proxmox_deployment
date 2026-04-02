@@ -123,7 +123,7 @@ docker compose --env-file .env.fedora --project-directory . run --rm -e PROJECT_
 
 ```bash
 # Ubuntu (template 9204)
-docker compose --env-file .env.ubuntu --project-directory . run --rm -e PROJECT_PROFILE=ubuntu -e PKR_VAR_template_vm_id=9204 deployer ./scripts/deploy.sh phase2
+docker compose --env-file .env.ubuntu --project-directory . run --rm -e PROJECT_PROFILE=ubuntu -e PKR_VAR_base_cloud_image_vm_id=9002 -e PKR_VAR_template_vm_id=9204 deployer ./scripts/deploy.sh phase2
 
 docker compose --env-file .env.ubuntu --project-directory . run --rm -e PROJECT_PROFILE=ubuntu -e TF_VAR_template_vm_id=9204 -e TF_VAR_vm_count=1 deployer ./scripts/deploy.sh phase3
 ```
@@ -156,13 +156,15 @@ docker compose --env-file .env.fedora --project-directory . run --rm -e PROJECT_
 # UBUNTU WORKFLOW (template VMID 9204)
 # Uses: .env.ubuntu
 # NOTE: Phase 2 does NOT need --service-ports (cloud-image clone)
+# NOTE: PKR_VAR_base_cloud_image_vm_id must be the existing imported
+#       Ubuntu cloud-image base template VMID in Proxmox.
 # ================================================================
 
 # Phase 1: API test
 docker compose --env-file .env.ubuntu --project-directory . run --rm -e PROJECT_PROFILE=ubuntu deployer ./scripts/deploy.sh phase1
 
 # Phase 2: Build Ubuntu template
-docker compose --env-file .env.ubuntu --project-directory . run --rm -e PROJECT_PROFILE=ubuntu -e PKR_VAR_template_vm_id=9204 deployer ./scripts/deploy.sh phase2
+docker compose --env-file .env.ubuntu --project-directory . run --rm -e PROJECT_PROFILE=ubuntu -e PKR_VAR_base_cloud_image_vm_id=9002 -e PKR_VAR_template_vm_id=9204 deployer ./scripts/deploy.sh phase2
 
 # Phase 3 plan: Dry-run Ubuntu VM deployment
 docker compose --env-file .env.ubuntu --project-directory . run --rm -e PROJECT_PROFILE=ubuntu -e TF_VAR_template_vm_id=9204 -e TF_VAR_vm_count=1 deployer ./scripts/deploy.sh phase3-plan

@@ -50,6 +50,50 @@ normalize_int() {
     echo "$raw"
 }
 
+check_proxmox_vm_exists() {
+    local vmid="$1"
+    local api_url="${PROXMOX_URL:-}"
+    local node_name="${PROXMOX_NODE:-}"
+    local token_id="${PROXMOX_API_TOKEN_ID:-}"
+    local token_secret="${PROXMOX_API_TOKEN_SECRET:-}"
+
+    if [ -z "$api_url" ] || [ -z "$node_name" ] || [ -z "$token_id" ] || [ -z "$token_secret" ]; then
+        warn "Skipping pre-check for VMID $vmid (missing Proxmox API env vars in current shell)"
+        return 0
+    fi
+
+    local url="${api_url%/}/nodes/${node_name}/qemu/${vmid}/status/current"
+    local auth_header="Authorization: PVEAPIToken=${token_id}=${token_secret}"
+    local response
+    response="$(curl -ksS -H "$auth_header" "$url" 2>/dev/null || true)"
+
+    if echo "$response" | grep -q '"data"'; then
+        return 0
+    fi
+    return 1
+}
+
+prepare_phase2_inputs() {
+    if [ "$PROJECT_PROFILE" != "ubuntu" ]; then
+        return 0
+    fi
+
+    local base_cloud_image_vm_id
+    base_cloud_image_vm_id="$(normalize_int "${PKR_VAR_base_cloud_image_vm_id:-}")"
+
+    if [ -z "$base_cloud_image_vm_id" ]; then
+        err "Ubuntu phase2 requires PKR_VAR_base_cloud_image_vm_id (VMID of imported Ubuntu cloud-image base template)."
+    fi
+
+    [[ "$base_cloud_image_vm_id" =~ ^[0-9]+$ ]] || err "PKR_VAR_base_cloud_image_vm_id must be a number, got: '${base_cloud_image_vm_id:-<empty>}'"
+    export PKR_VAR_base_cloud_image_vm_id="$base_cloud_image_vm_id"
+
+    log "Ubuntu clone source VMID: $PKR_VAR_base_cloud_image_vm_id"
+    if ! check_proxmox_vm_exists "$PKR_VAR_base_cloud_image_vm_id"; then
+        err "Base cloud-image VMID '$PKR_VAR_base_cloud_image_vm_id' was not found on node '$PROXMOX_NODE'. Import/create the Ubuntu base template first, then retry phase2."
+    fi
+}
+
 # ── Phase 1: Test Proxmox API ─────────────────────────────────────
 phase1() {
     log "═══ Phase 1: Testing Proxmox API Connectivity ($PROFILE_LABEL) ═══"
@@ -62,6 +106,8 @@ phase2() {
     log "═══ Phase 2: Building Packer Template ($PROFILE_LABEL) ═══"
     [ -d "$PACKER_DIR" ] || err "Packer directory not found: $PACKER_DIR"
     cd "$PACKER_DIR"
+
+    prepare_phase2_inputs
 
     log "Initializing Packer plugins..."
     packer init .
