@@ -9,7 +9,15 @@
 - name: Post-deployment configuration for Fedora COSMIC Atomic VMs
   hosts: all
   become: true
-  gather_facts: true
+  gather_facts: false
+
+  pre_tasks:
+    - name: Wait for system to become reachable via SSH
+      wait_for_connection:
+        timeout: 180
+
+    - name: Gather facts
+      setup:
 
   vars:
     # Extra packages to install via rpm-ostree
@@ -29,7 +37,7 @@
   tasks:
     # ── Wait for cloud-init to finish ──────────────────────────────
     - name: Wait for cloud-init to complete
-      command: cloud-init status --wait
+      shell: cloud-init status --wait || cloud-init status --long || true
       changed_when: false
       timeout: 300
 
@@ -39,12 +47,86 @@
       register: ostree_status
       changed_when: false
 
-    - name: Install extra packages via rpm-ostree
+    - name: Check which optional packages are currently installed
+      command: "rpm -q {{ item }}"
+      loop: "{{ extra_packages }}"
+      register: extra_package_checks_before
+      changed_when: false
+      failed_when: false
+
+    - name: Build list of optional packages still missing
+      set_fact:
+        missing_extra_packages_before: "{{ extra_package_checks_before.results | selectattr('rc', 'ne', 0) | map(attribute='item') | list }}"
+
+    - name: Report package layering baseline
+      debug:
+        msg: "Optional packages missing before install attempt: {{ missing_extra_packages_before | join(', ') }}"
+      when: missing_extra_packages_before | length > 0
+
+    - name: Report package layering baseline (all present)
+      debug:
+        msg: "All optional packages are already present in the template deployment."
+      when: missing_extra_packages_before | length == 0
+
+    - name: Set default install result when no packages are missing
+      set_fact:
+        rpm_ostree_install:
+          rc: 0
+          changed: false
+          stdout: ""
+          stderr: ""
+      when: missing_extra_packages_before | length == 0
+
+    - name: Refresh rpm-ostree metadata (best effort)
+      command: rpm-ostree refresh-md
+      register: rpm_ostree_refresh
+      changed_when: false
+      failed_when: false
+      retries: 3
+      delay: 20
+      until: rpm_ostree_refresh.rc == 0
+      when: missing_extra_packages_before | length > 0
+
+    - name: Install extra packages via rpm-ostree (with retries)
       command: >
         rpm-ostree install --idempotent --allow-inactive
-        {{ extra_packages | join(' ') }}
+        {{ missing_extra_packages_before | join(' ') }}
       register: rpm_ostree_install
-      changed_when: "'Installing:' in rpm_ostree_install.stdout or 'Staging deployment' in rpm_ostree_install.stdout"
+      retries: 4
+      delay: 45
+      until: rpm_ostree_install.rc == 0
+      failed_when: false
+      changed_when: rpm_ostree_install.rc == 0 and ('Installing:' in rpm_ostree_install.stdout or 'Staging deployment' in rpm_ostree_install.stdout)
+      when: missing_extra_packages_before | length > 0
+
+    - name: Warn if extra package layering could not complete
+      debug:
+        msg: |
+          WARNING: rpm-ostree package layering did not complete after retries.
+          Deployment will continue, but some optional tools may be missing.
+          Last error: {{ rpm_ostree_install.stderr | default('n/a') }}
+      when: rpm_ostree_install.rc != 0
+
+    - name: Check optional packages after install attempt
+      command: "rpm -q {{ item }}"
+      loop: "{{ extra_packages }}"
+      register: extra_package_checks_after
+      changed_when: false
+      failed_when: false
+
+    - name: Build list of optional packages still missing after install attempt
+      set_fact:
+        missing_extra_packages_after: "{{ extra_package_checks_after.results | selectattr('rc', 'ne', 0) | map(attribute='item') | list }}"
+
+    - name: Report optional packages still missing
+      debug:
+        msg: "Optional packages still missing after install attempt: {{ missing_extra_packages_after | join(', ') }}"
+      when: missing_extra_packages_after | length > 0
+
+    - name: Report optional package verification success
+      debug:
+        msg: "Optional package verification complete: all requested tools are available."
+      when: missing_extra_packages_after | length == 0
 
     # ── Reboot if rpm-ostree made changes ──────────────────────────
     - name: Reboot to apply rpm-ostree changes

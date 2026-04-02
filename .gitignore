@@ -1,5 +1,7 @@
 # Secrets
 .env
+.env.fedora
+.env.ubuntu
 
 # Terraform
 terraform/.terraform/

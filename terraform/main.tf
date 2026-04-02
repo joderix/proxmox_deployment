@@ -52,11 +52,14 @@ resource "proxmox_virtual_environment_vm" "srv_test" {
 
   # ── Cloud-Init Configuration ─────────────────────────────────────
   initialization {
+    # Use a SCSI cloud-init device; this template was not detecting IDE cloud-init media in-guest.
+    interface = "scsi1"
+
     # User configuration
     user_account {
       username = var.ci_user
       password = var.ci_password
-      keys     = [var.ssh_public_key]
+      keys     = compact([var.ssh_public_key, var.ssh_public_key_secondary])
     }
 
     # DNS
@@ -73,19 +76,13 @@ resource "proxmox_virtual_environment_vm" "srv_test" {
       }
     }
 
-    # Upgrade packages on first boot
-    upgrade = true
+    # # Upgrade packages on first boot
+    # upgrade = true
   }
 
   # Wait for the VM to be fully started before marking as created
   started = true
 
-  lifecycle {
-    ignore_changes = [
-      # Ignore changes to cloud-init after initial deployment
-      initialization,
-    ]
-  }
 }
 
 # ── Generate Ansible Inventory ────────────────────────────────────
@@ -93,9 +90,12 @@ resource "local_file" "ansible_inventory" {
   content = templatefile("${path.module}/inventory.tftpl", {
     vms = [for i, vm in proxmox_virtual_environment_vm.srv_test : {
       name = vm.name
+      # Keep inventory aligned with the cloud-init static address plan.
       ip   = format("192.168.3.%d", var.ip_base_octet + i + 1)
     }]
-    ansible_user = var.ci_user
+    ansible_user            = var.ci_user
+    ansible_password        = var.ci_password
+    ansible_become_password = var.ci_password
   })
   filename = "${path.module}/../ansible/inventory.yml"
 
@@ -111,13 +111,15 @@ resource "null_resource" "ansible_provisioning" {
 
   provisioner "local-exec" {
     working_dir = "${path.module}/../ansible"
-    command     = <<-EOT
-      echo "Waiting 60s for VMs to finish cloud-init..."
-      sleep 60
-      ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook \
-        -i inventory.yml \
-        playbook.yml
-    EOT
+    environment = {
+      ANSIBLE_CONFIG           = "${path.module}/../ansible/ansible.cfg"
+      ANSIBLE_HOST_KEY_CHECKING = "False"
+    }
+    command = join("\n", [
+      "echo 'Waiting for VMs to boot (Ansible will wait for SSH)...'",
+      "sleep 10",
+      "ansible-playbook -i inventory.yml playbook.yml"
+    ])
   }
 
   depends_on = [local_file.ansible_inventory]

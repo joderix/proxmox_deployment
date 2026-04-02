@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proxmox Deployment Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #1e40af;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --info: #0ea5e9;
+            --bg-dark: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --text-primary: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --border: #475569;
+            --control-height: 56px;
+            --control-padding: 14px 18px;
+            --panel-padding: 18px;
+            --controls-gap: 12px;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, var(--bg-dark) 0%, #0f1419 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            animation: slideInDown 0.5s ease-out;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--info) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        header p {
+            color: var(--text-secondary);
+            font-size: 1.1em;
+        }
+
+        .controls-panel {
+            background: linear-gradient(180deg, rgba(30, 41, 59, 0.92) 0%, rgba(15, 23, 42, 0.95) 100%);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: var(--panel-padding);
+            margin-bottom: 30px;
+            animation: slideInUp 0.5s ease-out 0.1s both;
+        }
+
+        .controls-row {
+            display: flex;
+            gap: var(--controls-gap);
+            align-items: stretch;
+            flex-wrap: wrap;
+            margin-bottom: var(--controls-gap);
+        }
+
+        .controls-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(15, 23, 42, 0.65);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px 12px;
+            min-height: var(--control-height);
+        }
+
+        .control-group.grow {
+            flex: 1;
+        }
+
+        .control-group label {
+            color: var(--text-secondary);
+            font-size: 0.9em;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .form-select,
+        .form-input {
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 0.9em;
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .form-select {
+            min-width: 220px;
+        }
+
+        .form-input {
+            width: 140px;
+        }
+
+        .form-input.input-small {
+            width: 100px;
+        }
+
+        .form-select:focus,
+        .form-input:focus {
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+
+        .controls-actions-row {
+            display: flex;
+            align-items: stretch;
+            gap: var(--controls-gap);
+        }
+
+        .action-buttons {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(170px, 1fr));
+            gap: var(--controls-gap);
+        }
+
+        .deploy-buttons {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(170px, 1fr));
+            gap: var(--controls-gap);
+        }
+
+        .template-hint {
+            color: var(--text-secondary);
+            font-size: 0.9em;
+            min-height: 22px;
+            margin-bottom: 10px;
+        }
+
+        .utility-row {
+            display: flex;
+            gap: var(--controls-gap);
+        }
+
+        .density-toggle {
+            display: inline-flex;
+            gap: 6px;
+            padding: 4px;
+            border-radius: 10px;
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid var(--border);
+        }
+
+        .density-btn {
+            min-height: 34px;
+            padding: 7px 12px;
+            border-radius: 8px;
+            box-shadow: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 0.86em;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+        }
+
+        .density-btn:hover:not(:disabled) {
+            transform: none;
+            box-shadow: none;
+            background: rgba(148, 163, 184, 0.16);
+            color: var(--text-primary);
+        }
+
+        .density-btn.active {
+            background: linear-gradient(135deg, #334155 0%, #1e293b 100%);
+            color: #f8fafc;
+        }
+
+        button {
+            min-height: var(--control-height);
+            padding: var(--control-padding);
+            border: none;
+            border-radius: 12px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.35);
+        }
+
+        .btn-icon {
+            width: 1.25em;
+            text-align: center;
+            line-height: 1;
+            flex: 0 0 auto;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            transform: translateY(-1px);
+        }
+
+        .btn-text {
+            text-align: left;
+            line-height: 1.2;
+            letter-spacing: 0.01em;
+        }
+
+        body[data-density="compact"] {
+            --control-height: 46px;
+            --control-padding: 10px 14px;
+            --panel-padding: 12px;
+            --controls-gap: 8px;
+        }
+
+        body[data-density="compact"] .control-group {
+            gap: 8px;
+            padding: 8px 10px;
+        }
+
+        body[data-density="compact"] .form-select,
+        body[data-density="compact"] .form-input {
+            padding: 8px 10px;
+            font-size: 0.85em;
+        }
+
+        body[data-density="compact"] button {
+            border-radius: 10px;
+            font-size: 0.92em;
+        }
+
+        body[data-density="compact"] .density-btn {
+            min-height: 30px;
+            font-size: 0.8em;
+            border-radius: 7px;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(59, 130, 246, 0.4);
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-build { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); }
+        .btn-phase1 { background: linear-gradient(135deg, var(--info) 0%, #06b6d4 100%); }
+        .btn-phase2 { background: linear-gradient(135deg, var(--warning) 0%, #d97706 100%); }
+        .btn-phase3 { background: linear-gradient(135deg, var(--success) 0%, #059669 100%); }
+        .btn-cancel { background: linear-gradient(135deg, var(--error) 0%, #b91c1c 100%); }
+        .btn-clear { background: linear-gradient(135deg, var(--text-secondary) 0%, var(--border) 100%); }
+
+        .status-bar {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            animation: slideInUp 0.5s ease-out 0.2s both;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--error);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .status-indicator.idle {
+            background: var(--text-secondary);
+            animation: none;
+        }
+
+        .status-indicator.running {
+            background: var(--warning);
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        .status-indicator.success {
+            background: var(--success);
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .logs-section {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            animation: slideInUp 0.5s ease-out 0.3s both;
+        }
+
+        .logs-header {
+            background: var(--bg-tertiary);
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logs-header h2 {
+            font-size: 1.2em;
+        }
+
+        .log-container {
+            height: 500px;
+            overflow-y: auto;
+            padding: 20px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.9em;
+            line-height: 1.6;
+            background: #0a0e1a;
+        }
+
+        .log-entry {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 8px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .log-entry:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .log-timestamp {
+            color: var(--text-secondary);
+            flex-shrink: 0;
+            min-width: 80px;
+        }
+
+        .log-level {
+            flex-shrink: 0;
+            min-width: 60px;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85em;
+        }
+
+        .log-level.info { color: var(--info); }
+        .log-level.output { color: var(--text-secondary); }
+        .log-level.success { color: var(--success); }
+        .log-level.warning { color: var(--warning); }
+        .log-level.error { color: var(--error); }
+
+        .log-message {
+            flex: 1;
+            word-break: break-word;
+            color: var(--text-primary);
+        }
+
+        .log-level.output ~ .log-message {
+            color: var(--text-secondary);
+            opacity: 0.8;
+        }
+
+        /* Scrollbar styling */
+        .log-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .log-container::-webkit-scrollbar-track {
+            background: var(--bg-tertiary);
+        }
+
+        .log-container::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+
+        .log-container::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+
+        /* Animations */
+        @keyframes slideInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 1.8em;
+            }
+
+            .controls-panel {
+                padding: var(--panel-padding);
+            }
+
+            .controls-top-row,
+            .controls-actions-row,
+            .utility-row {
+                flex-direction: column;
+            }
+
+            .control-group {
+                width: 100%;
+                flex-wrap: wrap;
+            }
+
+            .form-select,
+            .form-input,
+            .form-input.input-small {
+                width: 100%;
+                min-width: 0;
+            }
+
+            .action-buttons,
+            .deploy-buttons {
+                width: 100%;
+                grid-template-columns: 1fr;
+            }
+
+            .utility-row button {
+                width: 100%;
+            }
+
+            .btn-text {
+                text-align: center;
+            }
+
+            .log-container {
+                height: 300px;
+            }
+
+            .status-bar {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .controls-actions-row {
+                flex-direction: column;
+            }
+
+            .action-buttons,
+            .deploy-buttons {
+                width: 100%;
+            }
+
+            .action-buttons {
+                grid-template-columns: repeat(2, minmax(150px, 1fr));
+            }
+        }
+
+        .loading {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top: 2px solid white;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🖥️ Proxmox Deployment Dashboard</h1>
+            <p>Automated VM deployment pipeline for Proxmox 8.4</p>
+        </header>
+
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="status-indicator idle" id="statusIndicator"></div>
+                <span id="statusText">Ready</span>
+            </div>
+            <div class="status-item">
+                <span id="logCount">0 logs</span>
+            </div>
+        </div>
+
+        <div class="controls-panel">
+            <div class="controls-row controls-top-row">
+                <div class="control-group">
+                    <label for="profileSelect">Profile</label>
+                    <select id="profileSelect" class="form-select">
+                        <option value="fedora" selected>Fedora COSMIC Atomic</option>
+                        <option value="ubuntu">Ubuntu Server</option>
+                    </select>
+                </div>
+                <div class="control-group grow">
+                    <label for="templateVmId">Template</label>
+                    <input type="number" id="templateVmId" class="form-input" placeholder="Template VM ID" min="100">
+                    <label for="vmCount">Count</label>
+                    <input type="number" id="vmCount" class="form-input input-small" placeholder="VM count" min="1" max="20" value="1">
+                </div>
+                <div class="control-group">
+                    <label>Density</label>
+                    <div class="density-toggle" role="group" aria-label="Layout density">
+                        <button class="density-btn active" id="densityComfortable" type="button" onclick="setDensity('comfortable')">Comfortable</button>
+                        <button class="density-btn" id="densityCompact" type="button" onclick="setDensity('compact')">Compact</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="controls-row controls-actions-row">
+                <div class="action-buttons">
+                    <button class="btn-build" onclick="startTask('build')">
+                        <span class="btn-icon">🏗️</span>
+                        <span class="btn-text">Build Container</span>
+                    </button>
+                    <button class="btn-phase1" onclick="startTask('phase1')">
+                        <span class="btn-icon">🧪</span>
+                        <span class="btn-text">Phase 1: Test API</span>
+                    </button>
+                    <button class="btn-phase2" onclick="startTask('phase2')">
+                        <span class="btn-icon">📦</span>
+                        <span class="btn-text">Phase 2: Build Template</span>
+                    </button>
+                </div>
+
+                <div class="deploy-buttons">
+                    <button class="btn-phase1" onclick="startPhase3Plan()">
+                        <span class="btn-icon">🧾</span>
+                        <span class="btn-text">Phase 3: Plan Only</span>
+                    </button>
+                    <button class="btn-phase3" onclick="startPhase3()">
+                        <span class="btn-icon">🚀</span>
+                        <span class="btn-text">Phase 3: Deploy VMs</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="template-hint" id="templateProfileHint"></div>
+
+            <div class="controls-row utility-row">
+                <button class="btn-cancel" onclick="cancelTask()">
+                    <span class="btn-icon">🛑</span>
+                    <span class="btn-text">Cancel</span>
+                </button>
+                <button class="btn-clear" onclick="clearLogs()">
+                    <span class="btn-icon">🗑️</span>
+                    <span class="btn-text">Clear Logs</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="logs-section">
+            <div class="logs-header">
+                <h2>📋 Live Logs</h2>
+                <span id="updateIndicator" style="display: none;" class="loading"></span>
+            </div>
+            <div class="log-container" id="logContainer">
+                <div class="log-entry" style="opacity: 0.5;">
+                    <span class="log-timestamp">--:--:--</span>
+                    <span class="log-level info">INFO</span>
+                    <span class="log-message">Waiting for tasks...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const logContainer = document.getElementById('logContainer');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        const logCount = document.getElementById('logCount');
+        const updateIndicator = document.getElementById('updateIndicator');
+        const profileSelect = document.getElementById('profileSelect');
+        const templateVmIdInput = document.getElementById('templateVmId');
+        const templateProfileHint = document.getElementById('templateProfileHint');
+        const densityComfortableBtn = document.getElementById('densityComfortable');
+        const densityCompactBtn = document.getElementById('densityCompact');
+
+        let lastLogCount = 0;
+        let isRunning = false;
+        let templateProfileMap = {};
+
+        function selectedProfile() {
+            return profileSelect.value || 'fedora';
+        }
+
+        function setDensity(mode) {
+            const density = mode === 'compact' ? 'compact' : 'comfortable';
+            document.body.setAttribute('data-density', density);
+            densityComfortableBtn.classList.toggle('active', density === 'comfortable');
+            densityCompactBtn.classList.toggle('active', density === 'compact');
+            localStorage.setItem('dashboardDensity', density);
+        }
+
+        function initDensity() {
+            const saved = localStorage.getItem('dashboardDensity');
+            setDensity(saved === 'compact' ? 'compact' : 'comfortable');
+        }
+
+        function applyMappedProfile() {
+            const templateVmId = templateVmIdInput.value.trim();
+            if (!templateVmId) {
+                templateProfileHint.textContent = '';
+                return;
+            }
+
+            const mapped = templateProfileMap[templateVmId];
+            if (mapped) {
+                profileSelect.value = mapped;
+                templateProfileHint.textContent = `Template ${templateVmId} is mapped to profile '${mapped}'.`;
+            } else {
+                templateProfileHint.textContent = `No mapping configured for template ${templateVmId}; using selected profile '${selectedProfile()}'.`;
+            }
+        }
+
+        async function loadTemplateProfileMap() {
+            try {
+                const response = await fetch('/api/template-profile-map');
+                if (!response.ok) {
+                    return;
+                }
+                templateProfileMap = await response.json();
+                applyMappedProfile();
+            } catch (err) {
+                console.error('Error loading template/profile map:', err);
+            }
+        }
+
+        async function startTask(taskType) {
+            const endpoints = {
+                'build': '/api/tasks/build',
+                'phase1': '/api/tasks/phase1',
+                'phase2': '/api/tasks/phase2'
+            };
+
+            try {
+                const response = await fetch(endpoints[taskType], {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ profile: selectedProfile() })
+                });
+                if (response.ok) {
+                    isRunning = true;
+                    updateStatus();
+                    startPolling();
+                } else {
+                    const data = await response.json();
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            } catch (err) {
+                alert('Error starting task: ' + err.message);
+            }
+        }
+
+        async function startPhase3() {
+            const templateVmId = templateVmIdInput.value.trim();
+            const vmCount = document.getElementById('vmCount').value.trim() || '1';
+
+            if (!templateVmId) {
+                alert('Please enter the Template VM ID (from Phase 2 output)');
+                templateVmIdInput.focus();
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/tasks/phase3', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        profile: selectedProfile(),
+                        template_vm_id: templateVmId,
+                        vm_count: vmCount
+                    })
+                });
+                if (response.ok) {
+                    isRunning = true;
+                    updateStatus();
+                    startPolling();
+                } else {
+                    const data = await response.json();
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            } catch (err) {
+                alert('Error starting Phase 3: ' + err.message);
+            }
+        }
+
+        async function startPhase3Plan() {
+            const templateVmId = templateVmIdInput.value.trim();
+            const vmCount = document.getElementById('vmCount').value.trim() || '1';
+
+            if (!templateVmId) {
+                alert('Please enter the Template VM ID (from Phase 2 output)');
+                templateVmIdInput.focus();
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/tasks/phase3/plan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        profile: selectedProfile(),
+                        template_vm_id: templateVmId,
+                        vm_count: vmCount
+                    })
+                });
+                if (response.ok) {
+                    isRunning = true;
+                    updateStatus();
+                    startPolling();
+                } else {
+                    const data = await response.json();
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            } catch (err) {
+                alert('Error starting Phase 3 plan: ' + err.message);
+            }
+        }
+
+        async function cancelTask() {
+            if (!isRunning) {
+                alert('No task is currently running');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/cancel', { method: 'POST' });
+                if (response.ok) {
+                    isRunning = false;
+                    updateStatus();
+                } else {
+                    const data = await response.json();
+                    alert('Error: ' + (data.error || 'Failed to cancel'));
+                }
+            } catch (err) {
+                alert('Error cancelling task: ' + err.message);
+            }
+        }
+
+        async function clearLogs() {
+            try {
+                await fetch('/api/logs/clear', { method: 'POST' });
+                lastLogCount = 0;
+                updateLogs();
+            } catch (err) {
+                alert('Error clearing logs: ' + err.message);
+            }
+        }
+
+        async function updateStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                isRunning = data.is_running;
+
+                if (isRunning) {
+                    statusIndicator.className = 'status-indicator running';
+                    statusText.textContent = 'Running...';
+                    updateIndicator.style.display = 'inline-block';
+                } else {
+                    statusIndicator.className = 'status-indicator idle';
+                    statusText.textContent = 'Ready';
+                    updateIndicator.style.display = 'none';
+                }
+            } catch (err) {
+                console.error('Error updating status:', err);
+            }
+        }
+
+        async function updateLogs() {
+            try {
+                const response = await fetch('/api/logs');
+                const logs = await response.json();
+
+                logCount.textContent = logs.length + ' logs';
+
+                // Only update if logs changed
+                if (logs.length !== lastLogCount) {
+                    lastLogCount = logs.length;
+                    logContainer.innerHTML = logs.map(log => `
+                        <div class="log-entry">
+                            <span class="log-timestamp">${log.timestamp}</span>
+                            <span class="log-level ${log.level}">${log.level.toUpperCase()}</span>
+                            <span class="log-message">${escapeHtml(log.message)}</span>
+                        </div>
+                    `).join('');
+
+                    // Auto-scroll to bottom
+                    logContainer.scrollTop = logContainer.scrollHeight;
+                }
+            } catch (err) {
+                console.error('Error updating logs:', err);
+            }
+        }
+
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        function startPolling() {
+            updateStatus();
+            updateLogs();
+            const pollInterval = setInterval(async () => {
+                await updateStatus();
+                await updateLogs();
+                if (!isRunning) {
+                    clearInterval(pollInterval);
+                }
+            }, 500);
+        }
+
+        // Initial status and logs
+        updateStatus();
+        updateLogs();
+        loadTemplateProfileMap();
+        initDensity();
+
+        templateVmIdInput.addEventListener('input', applyMappedProfile);
+        profileSelect.addEventListener('change', applyMappedProfile);
+
+        // Poll every 2 seconds when idle
+        setInterval(updateStatus, 2000);
+        setInterval(updateLogs, 1000);
+    </script>
+</body>
+</html>

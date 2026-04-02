@@ -1,12 +1,24 @@
+# Platform Support:
+#   ✓ Windows/macOS/Linux: bridge networking with explicit port publishing
+#   ✓ Proxmox can reach the Packer HTTP server via HOST_IP:18080
+
 services:
   deployer:
     build: .
     container_name: proxmox-deployer
     volumes:
       - ./:/workspace
+      # Provide host SSH keys to the container (entrypoint copies with strict perms).
+      - "${USERPROFILE}/.ssh:/host_ssh:ro"
     env_file:
-      - .env
+      - ${DEPLOY_ENV_FILE:-.env}
+    # Uncomment to set HTTP server IP for Packer kickstart on Windows
+    # Replace 192.168.3.100 with your Windows host's local network IP
+    environment:
+      PKR_VAR_http_server_ip: "192.168.3.113"
+      PKR_VAR_http_server_port: "18080"
+    ports:
+      - "18080:18080"
     stdin_open: true
     tty: true
-    # Host networking so Packer HTTP server is reachable from Proxmox VMs
-    network_mode: host
+    # Use bridge networking with explicit port publishing for reliable cross-platform behavior.

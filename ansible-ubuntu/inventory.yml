@@ -1,0 +1,10 @@
+---
+# Auto-generated Ansible inventory from Terraform
+# Do not edit manually - managed by terraform/main.tf
+all:
+  hosts:
+    srv-test-01:
+      ansible_host: 192.168.3.201
+  vars:
+    ansible_user: ansible
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no'

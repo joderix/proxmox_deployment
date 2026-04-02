@@ -90,6 +90,12 @@ variable "ssh_public_key" {
   description = "SSH public key for cloud-init"
 }
 
+variable "ssh_public_key_secondary" {
+  type        = string
+  default     = ""
+  description = "Optional secondary SSH public key for cloud-init"
+}
+
 variable "dns_domain" {
   type    = string
   default = "local.derix.icu"

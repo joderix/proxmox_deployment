@@ -9,4 +9,8 @@ all:
 %{ endfor ~}
   vars:
     ansible_user: ${ansible_user}
-    ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+    ansible_password: ${ansible_password}
+    ansible_ssh_pass: ${ansible_password}
+    ansible_become_password: ${ansible_become_password}
+    ansible_become_pass: ${ansible_become_password}
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
