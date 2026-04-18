@@ -1,3 +1,6 @@
+# NUL files (Windows-specific artifacts)
+NUL
+
 # Secrets
 .env
 .env.fedora
